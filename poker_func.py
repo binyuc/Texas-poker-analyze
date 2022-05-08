@@ -22,8 +22,6 @@ hand_type_rankings = ("High Card", "Pair", "Two Pair", "Three of a Kind",
                       "Straight", "Flush", "Full House", "Four of a Kind",
                       "Straight Flush", "Royal Flush")
 
-global full_cards_list
-
 
 def build_new_poker_bag():
     global full_cards_list
@@ -41,7 +39,6 @@ def build_new_poker_bag():
 
 
 def generate_rest_of_poker_bag(hands_list, board_deck):
-    global full_cards_list
     '''读取已有的牌，并剔除现有的牌，返回剩余的牌'''
     for each_hands in hands_list:
         if each_hands is not None:
@@ -49,8 +46,8 @@ def generate_rest_of_poker_bag(hands_list, board_deck):
                 full_cards_list.remove(each_card)
     for each_card in board_deck:
         full_cards_list.remove(each_card)
-    print(len(full_cards_list))
-    return full_cards_list
+
+    return print('剔除已知的牌，牌堆还剩{}张牌'.format(len(full_cards_list)))
 
 
 def number_ranks(cards: str):
@@ -218,51 +215,32 @@ def compare_hands(hands_list):
 
 
 def run_simulation(hands_list, board_deck):
+    ''':param
+    hands_list: [我的手牌，对方手上的牌],[str,str]
+    board_deck : 翻牌的牌
+    '''
     num_players = len(hands_list)
 
-    result_histograms, winner_list = [], [0] * (num_players + 1)
+    card_type_result_histograms, tie_win_lose_list = [], [0] * (num_players + 1)
     for _ in range(num_players):
-        result_histograms.append([0] * len(hand_type_rankings))
+        card_type_result_histograms.append([0] * len(hand_type_rankings))
 
     board_length = 0 if board_deck is None else len(board_deck)
-
+    ''':param
+    card_type_result_histograms: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]] 
+    tie_win_lose_list: [0, 0, 0] 
+    board_length: 3
+    '''
     if (None, None) in hands_list:
         unknown_index = hands_list.index((None, None))
-        for filler_hole_cards in itertools.combinations(deck, 2):  # todo 这一部是为对方构建底牌，把每个底牌轮进去算
+        # todo 这一部是为对方构建底牌，把每个底牌轮进去算
+        for filler_hole_cards in itertools.combinations(full_cards_list, 2):
             hands_list[unknown_index] = filler_hole_cards
-            deck_list = list(deck)
-            deck_list.remove(filler_hole_cards[0])
-            deck_list.remove(filler_hole_cards[1])
-            # todo 解析参数
-            # todo generate_boards - 函数
-            '''
-            :param tuple(deck_list) 元组，剩余牌
-            hold_cards_list: 手牌和对方的手牌，这个是组合， ''((Ks, Jc), (As, 8s))''
-            num = 1
-            board_length = 3 or 4 or 5 翻牌区的卡牌数量
-            given_board = 翻牌区的列表 [Ac, Kh, Ts]
-            winner_list = [33902, 619963, 124275] 猜测是牌局结果： tie win lose
-            result_list = 10种牌型结果 [[0, 36456, 27841, 5196, 12561, 0, 2015, 81, 0, 0], [8568, 35532, 22895, 4946, 8984, 681, 2398, 143, 3, 0]]
-            '''
-            holdem_functions.find_winner(generate_boards, tuple(deck_list),
-                                         tuple(hole_cards_list), num,
-                                         board_length, given_board, winner_list,
-                                         result_histograms)
-
-    else:
-        holdem_functions.find_winner(generate_boards, deck, hole_cards, num,
-                                     board_length, given_board, winner_list,
-                                     result_histograms)
-    # if verbose: todo 没啥用 verbose
-    '''
-    result_histograms,每种牌型的赢次数 = [[0, 0, 990, 0, 0, 0, 0, 0, 0, 0], [0, 532, 352, 70, 12, 0, 23, 1, 0, 0]]
-    winner_list = [70, 688, 232] 总次数
-    '''
-    players_histograms = holdem_functions.calc_histogram(result_histograms, winner_list)
-    return [holdem_functions.find_winning_percentage(winner_list), players_histograms]
+            full_cards_list.remove(filler_hole_cards[0])
+            full_cards_list.remove(filler_hole_cards[1])
 
 
-def poker_run(hold_cards, enemy_hold_cards, board_deck):
+def poker_run(hold_cards: str, enemy_hold_cards: str, board_deck: list):
     ''':param
     hold_cards : 玩家手上的牌
     enemy_hold_Cards : 对方手上的牌
@@ -272,9 +250,13 @@ def poker_run(hold_cards, enemy_hold_cards, board_deck):
     what_to_win：赢的每种牌型的可能性、需要的卡
     what_to_lose：输的每种牌型的可能性、输掉的卡
     '''
-    full_cards_list = build_new_poker_bag()
-    generate_rest_of_poker_bag([hold_cards, enemy_hold_cards], board_deck)
-    return print('done')
+    begin_time = time.time()
+    build_new_poker_bag()
+    generate_rest_of_poker_bag(hands_list=[hold_cards, enemy_hold_cards], board_deck=board_deck)
+
+    run_simulation([hold_cards, enemy_hold_cards], board_deck)
+    print('总程序运行完毕，共耗时{}'.format(time.time() - begin_time))
+    return
 
 
 if __name__ == '__main__':
