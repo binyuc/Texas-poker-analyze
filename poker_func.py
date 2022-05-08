@@ -8,7 +8,8 @@ import math
 from scipy.special import comb, perm
 import itertools
 from tqdm import tqdm
-
+from poker_tools import *
+from poker_tools import Basic_rule
 pd.set_option('display.max_rows', 1000)
 
 poker_num_reference = "0123456789TJQKA"
@@ -50,153 +51,11 @@ def generate_rest_of_poker_bag(hands_list, board_deck):
     return print('剔除已知的牌，牌堆还剩{}张牌'.format(len(full_cards_list)))
 
 
-def number_ranks(cards: str):
-    '''
-    :param: cards → str
-    :return：[14,12,11,10,7] 按大小排序的牌面列表列表'''
-    ranks = [poker_num_reference.index(number) for number, color in cards.split()]
-    ranks.sort(reverse=True)
-    return ranks
-
-
-class Basic_rule:
-    '''基础方程工具类，用于判断排序'''
-
-    def __init__(self, cards):
-        self.cards = ' '.join(sorted(cards.split()))
-        pass
-
-    def same_color_count(self, same_num):
-        '''判断花色数量和花色，返回的是花色，列表'''
-        color_list = [color for number, color in self.cards.split()]
-        res = []
-        for i in color_list:
-            if color_list.count(i) == same_num:
-                res.append(i)
-        return list(set(res))
-
-    def same_number_count(self, same_num):
-        '''判断数字数量,返回的是牌面'''
-        number_list = [number for number, color in self.cards.split()]
-        res = []
-        for i in number_list:
-            if number_list.count(i) == same_num:
-                res.append(i)
-        return sorted(list(set(res)), reverse=True)
-
-    def analyze_straight(self):
-        '''desc 牌是不同的5张数值，所以最大-最小=4'''
-        card_list = number_ranks(self.cards)
-        return len(set(number_ranks(self.cards))) == 5 and max(card_list) - min(card_list) == 4
-
-    def analyze_same_color(self):
-        '''desc 判断是否同花'''
-        if len(self.same_color_count(5)) > 0:
-            return True
-
-    def analyze_boom(self):
-        '''desc判断是否为炸弹'''
-        if len(self.same_number_count(4)) > 0:
-            return True
-
-    def analyze_fullhouse(self):
-        '''desc 判断是否为葫芦fullhouse 3带2'''
-        if len(self.same_number_count(3)) > 0 and len(self.same_number_count(2)) > 0:
-            return True
-
-    def analyze_three_set(self):
-        '''desc 判断是否为3条'''
-        if len(self.same_number_count(3)) > 0:
-            return True
-
-    def analyze_one_pair(self):
-        '''desc 判断是否为一对'''
-        if len(self.same_number_count(2)) > 0:
-            return True
-
-    def analyze_two_pair(self):
-        '''desc 判断是否为两对'''
-        if len(self.same_number_count(2)) == 2:
-            return True
-
-    def analyze_one_hand_rank(self):
-        '''
-        :desc:分析每个人的手牌大小总函数
-        :returns:
-        '''
-        cards_list = number_ranks(self.cards)
-        # 皇家同花顺
-        if self.analyze_same_color() and self.analyze_straight() and max(cards_list) == 14:
-            return {'hand_card_score': 10, 'first_card': poker_num_to_face_reference[max(cards_list)],
-                    'first_card_score': max(cards_list), 'second_card': None, 'second_card_score': None,
-                    'hand_card_type_name': '皇家同花顺', 'cards_detail': self.cards}
-
-        # 同花顺
-        if self.analyze_same_color() and self.analyze_straight():
-            return {'hand_card_score': 9, 'first_card': poker_num_to_face_reference[max(cards_list)],
-                    'first_card_score': max(cards_list), 'second_card': None, 'second_card_score': None,
-                    'hand_card_type_name': '同花顺', 'cards_detail': self.cards}
-
-        # 四条
-        if self.analyze_boom():
-            return {'hand_card_score': 8, 'first_card': self.same_number_count(4)[0],
-                    'first_card_score': poker_face_to_num_reference[self.same_number_count(4)[0]], 'second_card': None,
-                    'second_card_score': None, 'hand_card_type_name': '炸弹四条', 'cards_detail': self.cards}
-
-        # 葫芦
-        if self.analyze_fullhouse():
-            return {'hand_card_score': 7, 'first_card': self.same_number_count(3)[0],
-                    'first_card_score': poker_face_to_num_reference[self.same_number_count(3)[0]],
-                    'second_card': self.same_number_count(2)[0],
-                    'second_card_score': poker_face_to_num_reference[self.same_number_count(2)[0]],
-                    'hand_card_type_name': '葫芦',
-                    'cards_detail': self.cards}
-        # 同花
-        if self.analyze_same_color():
-            return {'hand_card_score': 6, 'first_card': poker_num_to_face_reference[max(cards_list)],
-                    'first_card_score': max(cards_list), 'second_card': None, 'second_card_score': None,
-                    'hand_card_type_name': '同花', 'cards_detail': self.cards}
-
-        # 顺子
-        if self.analyze_straight():
-            return {'hand_card_score': 5, 'first_card': poker_num_to_face_reference[max(cards_list)],
-                    'first_card_score': max(cards_list), 'second_card': None, 'second_card_score': None,
-                    'hand_card_type_name': '顺子', 'cards_detail': self.cards}
-
-        # 三条
-        if self.analyze_three_set():
-            return {'hand_card_score': 4, 'first_card': self.same_number_count(3)[0],
-                    'first_card_score': poker_face_to_num_reference[self.same_number_count(3)[0]], 'second_card': None,
-                    'second_card_score': None, 'hand_card_type_name': '三条', 'cards_detail': self.cards}
-
-        # 两对
-        if self.analyze_two_pair():
-            if poker_face_to_num_reference[self.same_number_count(2)[0]] > poker_face_to_num_reference[
-                self.same_number_count(2)[1]]:
-                return {'hand_card_score': 3, 'first_card': self.same_number_count(2)[0],
-                        'first_card_score': poker_face_to_num_reference[self.same_number_count(2)[0]],
-                        'second_card': self.same_number_count(2)[1],
-                        'second_card_score': poker_face_to_num_reference[self.same_number_count(2)[1]],
-                        'hand_card_type_name': '两对',
-                        'cards_detail': self.cards}
-            else:
-                return {'hand_card_score': 3, 'first_card': self.same_number_count(2)[1],
-                        'first_card_score': poker_face_to_num_reference[self.same_number_count(2)[1]],
-                        'second_card': self.same_number_count(2)[0],
-                        'second_card_score': poker_face_to_num_reference[self.same_number_count(2)[0]],
-                        'hand_card_type_name': '两对',
-                        'cards_detail': self.cards}
-
-        # 一对
-        if self.analyze_one_pair():
-            return {'hand_card_score': 2, 'first_card': self.same_number_count(2)[0],
-                    'first_card_score': poker_face_to_num_reference[self.same_number_count(2)[0]], 'second_card': None,
-                    'second_card_score': None, 'hand_card_type_name': '一对', 'cards_detail': self.cards}
-
-        # 高牌
-        return {'hand_card_score': 1, 'first_card': poker_num_to_face_reference[max(cards_list)],
-                'first_card_score': max(cards_list), 'second_card': None, 'second_card_score': None,
-                'hand_card_type_name': '高牌', 'cards_detail': self.cards}
+def preprocess_hand_card_to_tuple(hand_card):
+    '''处理手牌,返回元组'''
+    if hand_card is None:
+        return (None, None)
+    return tuple(hand_card.split())
 
 
 def compare_hands(hands_list):
@@ -231,13 +90,45 @@ def run_simulation(hands_list, board_deck):
     tie_win_lose_list: [0, 0, 0] 
     board_length: 3
     '''
-    if (None, None) in hands_list:
-        unknown_index = hands_list.index((None, None))
+    hands_list_tuple = [preprocess_hand_card_to_tuple(hands_list[0]), preprocess_hand_card_to_tuple(hands_list[1])]
+    '''hands_list_tuple : [('AS', 'KH'), (None, None)]'''
+    if (None, None) in hands_list_tuple:
+        unknown_index = hands_list_tuple.index((None, None))
         # todo 这一部是为对方构建底牌，把每个底牌轮进去算
         for filler_hole_cards in itertools.combinations(full_cards_list, 2):
-            hands_list[unknown_index] = filler_hole_cards
-            full_cards_list.remove(filler_hole_cards[0])
-            full_cards_list.remove(filler_hole_cards[1])
+            hands_list_tuple[unknown_index] = filler_hole_cards
+
+            deck_list = full_cards_list.copy()
+            deck_list.remove(filler_hole_cards[0])
+            deck_list.remove(filler_hole_cards[1])
+
+            find_winner(tuple(hands_list_tuple), board_length, deck_list, board_deck)
+
+
+def preprocess_player_hands(flat_board):
+    suit_histogram, histogram = [0] * 4, [0] * 13
+    # Reversing the order in histogram so in the future, we can traverse
+    # starting from index 0
+    for card in flat_board:
+        histogram[14 - card.value] += 1
+        suit_histogram[card.suit_index] += 1
+    return suit_histogram, histogram, max(suit_histogram)
+
+
+def find_winner(hands_list_tuple, board_length, deck_list, board_deck):
+    result_list = [None] * len(hands_list_tuple)
+
+    print(list(hands_list_tuple))
+    for remaining_board in itertools.combinations(deck_list, 5 - board_length):
+        if board_deck is not None:
+            board = board_deck[:]
+            board.extend(remaining_board)
+        print(board)
+
+        for mark, hold_cards in enumerate(list(hands_list_tuple)):
+            result_list[mark] = print(Basic_rule(' '.join(hold_cards)).analyze_one_hand_rank())
+
+    return
 
 
 def poker_run(hold_cards: str, enemy_hold_cards: str, board_deck: list):
@@ -260,9 +151,9 @@ def poker_run(hold_cards: str, enemy_hold_cards: str, board_deck: list):
 
 
 if __name__ == '__main__':
-    # hold_cards = "AS KH"
-    hold_cards = "AS AH TH TS 9C"
-    hold_cards_2 = "5S 6C 7C JH 2D"
+    hold_cards = "AS KH"
+    # hold_cards = "AS AH TH TS 9C"
+    # hold_cards_2 = "5S 6C 7C JH 2D"
     enemy_hold_cards = None
     board_deck = ["AC", "KD", "TC"]
     poker_run(hold_cards=hold_cards, enemy_hold_cards=enemy_hold_cards, board_deck=board_deck)
