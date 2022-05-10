@@ -10,6 +10,8 @@ import itertools
 from tqdm import tqdm
 from poker_tools import *
 from poker_tools import Basic_rule
+from loguru import logger
+
 pd.set_option('display.max_rows', 1000)
 
 poker_num_reference = "0123456789TJQKA"
@@ -24,6 +26,91 @@ hand_type_rankings = ("High Card", "Pair", "Two Pair", "Three of a Kind",
                       "Straight Flush", "Royal Flush")
 
 
+def generate_suit_board(flat_board, flush_index):
+    histogram = [card.value for card in flat_board
+                 if card.suit_index == flush_index]
+    histogram.sort(reverse=True)
+    return histogram
+
+def detect_straight_flush(suit_board):
+    contiguous_length, fail_index = 1, len(suit_board) - 5
+    # Won't overflow list because we fail fast and check ahead
+    for index, elem in enumerate(suit_board):
+        current_val, next_val = elem, suit_board[index + 1]
+        if next_val == current_val - 1:
+            contiguous_length += 1
+            if contiguous_length == 5:
+                return True, current_val + 3
+        else:
+            # Fail fast if straight not possible
+            if index >= fail_index:
+                if (index == fail_index and next_val == 5 and
+                        suit_board[0] == 14):
+                    return True, 5
+                break
+            contiguous_length = 1
+    return False,
+
+def detect_hand(hole_cards, given_board, poker_face_res_list,
+                poker_num_res_list, max_poker_face):
+    # Determine if flush possible. If yes, four of a kind and full house are
+    # impossible, so return royal, straight, or regular flush.
+    if max_poker_face >= 3:
+        flush_index = poker_face_res_list.index(max_poker_face)
+        for hole_card in hole_cards:
+            if hole_card.suit_index == flush_index:
+                max_poker_face += 1
+        if max_poker_face >= 5:
+            flat_board = list(given_board)
+            flat_board.extend(hole_cards)
+            suit_board = generate_suit_board(flat_board, flush_index)
+            result = detect_straight_flush(suit_board)
+            if result[0]:
+                return (8, result[1]) if result[1] != 14 else (9,)
+            return 5, get_high_cards(suit_board)
+
+    # Add hole cards to histogram data structure and process it
+    full_histogram = poker_num_res_list[:]
+    for hole_card in hole_cards:
+        full_histogram[14 - hole_card.value] += 1
+    histogram_board = preprocess(full_histogram)
+
+    # Find which card value shows up the most and second most times
+    current_max, max_val, second_max, second_max_val = 0, 0, 0, 0
+    for item in histogram_board:
+        val, frequency = item[0], item[1]
+        if frequency > current_max:
+            second_max, second_max_val = current_max, max_val
+            current_max, max_val = frequency, val
+        elif frequency > second_max:
+            second_max, second_max_val = frequency, val
+
+    # Check to see if there is a four of a kind
+    if current_max == 4:
+        return 7, max_val, detect_highest_quad_kicker(histogram_board)
+    # Check to see if there is a full house
+    if current_max == 3 and second_max >= 2:
+        return 6, max_val, second_max_val
+    # Check to see if there is a straight
+    if len(histogram_board) >= 5:
+        result = detect_straight(histogram_board)
+        if result[0]:
+            return 4, result[1]
+    # Check to see if there is a three of a kind
+    if current_max == 3:
+        return 3, max_val, detect_three_of_a_kind_kickers(histogram_board)
+    if current_max == 2:
+        # Check to see if there is a two pair
+        if second_max == 2:
+            return 2, max_val, second_max_val, detect_highest_kicker(
+                histogram_board)
+        # Return pair
+        else:
+            return 1, max_val, detect_pair_kickers(histogram_board)
+    # Check for high cards
+    return 0, get_high_cards(histogram_board)
+
+
 def build_new_poker_bag():
     global full_cards_list
     ''':return 构建新的卡包，52张牌'''
@@ -35,7 +122,7 @@ def build_new_poker_bag():
         for number in poker_number_list:
             one_card = number + color
             full_cards_list.append(one_card)
-    print('构建新卡包，洗牌完成，共有{}张牌'.format(len(full_cards_list)))
+    logger.info('构建新卡包，洗牌完成，共有{}张牌'.format(len(full_cards_list)))
     return full_cards_list
 
 
@@ -56,6 +143,19 @@ def preprocess_hand_card_to_tuple(hand_card):
     if hand_card is None:
         return (None, None)
     return tuple(hand_card.split())
+
+
+def preprocess_board(flat_board):
+    ''':return
+    poker_face_res_list:
+    poker_num_res_list
+    max(poker_face_res_list):
+    '''
+    poker_face_res_list, poker_num_res_list = [0] * 4, [0] * 13
+    for card in flat_board:
+        poker_num_res_list[14 - card.value] += 1
+        poker_face_res_list[card.suit_index] += 1
+    return poker_face_res_list, poker_num_res_list, max(poker_face_res_list)
 
 
 def compare_hands(hands_list):
@@ -116,17 +216,27 @@ def preprocess_player_hands(flat_board):
 
 
 def find_winner(hands_list_tuple, board_length, deck_list, board_deck):
+    ''':param
+    hands_list_tuple
+    board_length： 3 board
+    deck_list: 剩余的卡片list
+    board_deck：翻牌区的牌
+    '''
+    # 总
     result_list = [None] * len(hands_list_tuple)
 
-    print(list(hands_list_tuple))
     for remaining_board in itertools.combinations(deck_list, 5 - board_length):
-        if board_deck is not None:
+        if board_deck:
             board = board_deck[:]
             board.extend(remaining_board)
-        print(board)
+        else:
+            board = remaining_board
+
+        poker_face_res_list, poker_num_res_list, max_poker_face = (preprocess_board(board))
 
         for mark, hold_cards in enumerate(list(hands_list_tuple)):
-            result_list[mark] = print(Basic_rule(' '.join(hold_cards)).analyze_one_hand_rank())
+            result_list[mark] = detect_hand(hold_cards, board, poker_face_res_list,
+                                            poker_num_res_list, max_poker_face)
 
     return
 

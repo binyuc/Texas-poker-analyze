@@ -10,6 +10,7 @@ hand_type_rankings = ("High Card", "Pair", "Two Pair", "Three of a Kind",
                       "Straight Flush", "Royal Flush")
 
 
+
 def number_ranks(cards: str):
     '''
     :param: cards → str
