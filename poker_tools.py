@@ -21,7 +21,7 @@ def number_ranks(cards: str):
 
 
 class Basic_rule:
-    '''基础方程工具类，用于判断排序'''
+    """基础方程工具类，用于判断排序"""
 
     def __init__(self, cards):
         self.cards = ' '.join(sorted(cards.split()))

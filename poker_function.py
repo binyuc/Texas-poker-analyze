@@ -1,13 +1,8 @@
 # 首先定义常量
 # 我们把牌面成为 poker_face，把牌力称为 poker_num
-import random
 import time
-import numpy as np
 import pandas as pd
-import math
-from scipy.special import comb, perm
 import itertools
-from tqdm import tqdm
 from poker_tools import *
 from poker_tools import Basic_rule
 from loguru import logger
@@ -15,6 +10,7 @@ from loguru import logger
 pd.set_option('display.max_rows', 1000)
 
 poker_num_reference = "0123456789TJQKA"
+value_string = "AKQJT98765432"
 poker_color_reference = {"S": 0, "C": 1, "H": 2, "D": 3}
 # 黑桃 S - Spade，梅花C - Club，方块D - Diamonds，红桃H - Hearts
 poker_face_to_num_reference = {"A": 14, "K": 13, "Q": 12, "J": 11, "T": 10, "9": 9, "8": 8, "7": 7, "6": 6, "5": 5,
@@ -196,18 +192,18 @@ def build_new_poker_bag():
 
 
 def preprocess_hand_card_to_tuple(hand_card):
-    '''处理手牌,返回元组'''
+    """处理手牌,返回元组"""
     if hand_card is None:
         return (None, None)
     return tuple(hand_card)
 
 
 def preprocess_board(flat_board):
-    ''':return
+    """:return
     poker_face_res_list:
     poker_num_res_list
     max(poker_face_res_list):
-    '''
+    """
     poker_color_res_list, poker_num_res_list = [0] * 4, [0] * 13
     for card in flat_board:
         poker_num_res_list[14 - Card(card).value] += 1
@@ -216,7 +212,7 @@ def preprocess_board(flat_board):
 
 
 def compare_hands(result_list):
-    '''比较两个手牌的大小'''
+    """比较两个手牌的大小"""
     # print(result_list)
     best_hand = max(result_list)
     # print(best_hand)
@@ -238,7 +234,7 @@ def preprocess_player_hands(flat_board):
 
 
 def generate_rest_of_poker_bag(hands_list, open_board_deck):
-    '''读取已有的牌，并剔除现有的牌，返回剩余的牌'''
+    """读取已有的牌，并剔除现有的牌，返回剩余的牌"""
     for each_hands in hands_list:
         for card in each_hands:
             if card is not None:
@@ -257,9 +253,19 @@ class Card:
         self.value = poker_face_to_num_reference[value]
         self.color_index = poker_color_reference[color]
 
+    # def __repr__(self):
+    #     return value_string[14 - self.value] + str(self.color_index)
+    #
+    # def __eq__(self, other):
+    #     if self is None:
+    #         return other is None
+    #     elif other is None:
+    #         return False
+    #     return self.value == other.value and self.color_index == other.suit
+
 
 def calc_histogram(result_histograms, winner_list):
-    '''计算牌型的成功率和对应关系'''
+    """计算牌型的成功率和对应关系"""
     float_iterations = float(sum(winner_list))
     players_hist = []
     for player_index, histogram in enumerate(result_histograms):
@@ -272,7 +278,7 @@ def calc_histogram(result_histograms, winner_list):
 
 # Returns the winning percentages
 def find_winning_percentage(winner_list):
-    '''计算tie win lose百分比'''
+    """计算tie win lose百分比"""
     float_iterations = float(sum(winner_list))
     percentages = []
     for num_wins in winner_list:
@@ -325,12 +331,12 @@ def run_simulation(hands_list, open_board_deck):
 
 def find_winner(hands_list_tuple, board_length, deck_list, open_board_deck, tie_win_lose_list,
                 card_type_result_histograms):
-    ''':param
+    """:param
     hands_list_tuple
     board_length： 3 board
     deck_list: 剩余的卡片list
     board_deck：翻牌区的牌
-    '''
+    """
     # 总
     result_list = [None] * len(hands_list_tuple)
 
@@ -370,7 +376,7 @@ def poker_run(my_hold_cards: list, enemy_hold_cards: list, open_board_deck: list
 
     generate_rest_of_poker_bag(hands_list=[my_hold_cards, enemy_hold_cards], open_board_deck=open_board_deck)
     logger.info('剔除已知的牌，牌堆还剩{}张牌'.format(len(full_cards_list)))
-
+    logger.info('开始模拟情景')
     final_result = run_simulation([my_hold_cards, enemy_hold_cards], open_board_deck)
 
     logger.info('总程序运行完毕，共耗时{}'.format(time.time() - begin_time))
@@ -379,7 +385,7 @@ def poker_run(my_hold_cards: list, enemy_hold_cards: list, open_board_deck: list
 
 
 if __name__ == '__main__':
-    my_hold_cards = ['AS', '2S']
+    my_hold_cards = ['7S', '2S']
     enemy_hold_cards = [None, None]
     open_board_deck = ["KS", "QS", "TS"]
     poker_run(my_hold_cards=my_hold_cards, enemy_hold_cards=enemy_hold_cards, open_board_deck=open_board_deck)
