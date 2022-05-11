@@ -1,13 +1,12 @@
 # 首先定义常量
 # 我们把牌面成为 poker_face，把牌力称为 poker_num
 import time
-import pandas as pd
+# import pandas as pd 别导入，慢的一批
 import itertools
 from poker_tools import *
-from poker_tools import Basic_rule
 from loguru import logger
 
-pd.set_option('display.max_rows', 1000)
+# pd.set_option('display.max_rows', 1000)
 
 poker_num_reference = "0123456789TJQKA"
 value_string = "AKQJT98765432"
@@ -23,25 +22,27 @@ hand_type_rankings = ("High Card", "Pair", "Two Pair", "Three of a Kind",
 
 
 def generate_suit_board(flat_board, flush_index):
-    histogram = [Card(card).value for card in flat_board
-                 if Card(card).color_index == flush_index]
-    histogram.sort(reverse=True)
+    """:param，将同花的卡牌组合起来，返回一个由高到底的列表"""
+    # histogram = [Card(card).value for card in flat_board
+    #              if Card(card).color_index == flush_index]
+    histogram = sorted([poker_face_to_num_reference[card[0]] for card in flat_board
+                 if poker_color_reference[card[1]] == flush_index], reverse=True)
+    # histogram.sort(reverse=True)
     return histogram
 
 
 def detect_straight_flush(suit_board):
     contiguous_length, fail_index = 1, len(suit_board) - 5
-    # Won't overflow list because we fail fast and check ahead
-    for index, elem in enumerate(suit_board):
-        current_val, next_val = elem, suit_board[index + 1]
+    for mark, elem in enumerate(suit_board):
+        current_val, next_val = elem, suit_board[mark + 1]
         if next_val == current_val - 1:
             contiguous_length += 1
             if contiguous_length == 5:
                 return True, current_val + 3
         else:
             # Fail fast if straight not possible
-            if index >= fail_index:
-                if (index == fail_index and next_val == 5 and
+            if mark >= fail_index:
+                if (mark == fail_index and next_val == 5 and
                         suit_board[0] == 14):
                     return True, 5
                 break
@@ -119,17 +120,22 @@ def detect_highest_quad_kicker(histogram_board):
 
 def detect_hand(hold_cards, given_board, poker_color_res_list,
                 poker_num_res_list, max_poker_color_cnt):
-    # Determine if flush possible. If yes, four of a kind and full house are
-    # impossible, so return royal, straight, or regular flush.
+    """:param
+    hold_cards:[('7S', '2S'), ('2H', '3H')]
+    given_board:['KS', 'QS', 'TS']
+    poker_color_res_list [3, 0, 2, 0]
+    poker_num_res_list [0, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0]
+    max_poker_color_cnt 3
+    """
     if max_poker_color_cnt >= 3:
         flush_index = poker_color_res_list.index(max_poker_color_cnt)
         for card in hold_cards:
-            if Card(card).color_index == flush_index:
+            # if Card(card).color_index == flush_index:
+            if poker_color_reference[card[1]] == flush_index:
                 max_poker_color_cnt += 1
         if max_poker_color_cnt >= 5:
-            flat_board = given_board
-            flat_board.extend(hold_cards)
-            suit_board = generate_suit_board(flat_board, flush_index)
+            given_board.extend(hold_cards)
+            suit_board = generate_suit_board(given_board, flush_index)
             result = detect_straight_flush(suit_board)
             if result[0]:
                 return (8, result[1]) if result[1] != 14 else (9,)
@@ -138,7 +144,8 @@ def detect_hand(hold_cards, given_board, poker_color_res_list,
     # Add hole cards to histogram data structure and process it
     full_histogram = poker_num_res_list[:]
     for card in hold_cards:
-        full_histogram[14 - Card(card).value] += 1
+        # full_histogram[14 - Card(card).value] += 1
+        full_histogram[14 - poker_face_to_num_reference[card[0]]] += 1
     histogram_board = preprocess(full_histogram)
 
     # Find which card value shows up the most and second most times
@@ -206,8 +213,10 @@ def preprocess_board(flat_board):
     """
     poker_color_res_list, poker_num_res_list = [0] * 4, [0] * 13
     for card in flat_board:
-        poker_num_res_list[14 - Card(card).value] += 1
-        poker_color_res_list[Card(card).color_index] += 1
+        # poker_num_res_list[14 - Card(card).value] += 1
+        # poker_color_res_list[Card(card).color_index] += 1
+        poker_num_res_list[14 - poker_face_to_num_reference[card[0]]] += 1
+        poker_color_res_list[poker_color_reference[card[1]]] += 1
     return poker_color_res_list, poker_num_res_list, max(poker_color_res_list)
 
 
@@ -245,23 +254,22 @@ def generate_rest_of_poker_bag(hands_list, open_board_deck):
     return
 
 
-class Card:
-    """用于声明牌的类，返回牌色和牌面"""
-
-    def __init__(self, card_string):
-        value, color = card_string[0], card_string[1]
-        self.value = poker_face_to_num_reference[value]
-        self.color_index = poker_color_reference[color]
+# class Card:
+#     """用于声明牌的类，返回牌色和牌面"""
+#     def __init__(self, card_string):
+#         value, self.color = card_string[0], card_string[1]
+#         self.value = poker_face_to_num_reference[value]
+#         self.color_index = poker_color_reference[self.color]
 
     # def __repr__(self):
-    #     return value_string[14 - self.value] + str(self.color_index)
+    #     return value_string[14 - self.value] + self.color
     #
     # def __eq__(self, other):
     #     if self is None:
     #         return other is None
     #     elif other is None:
     #         return False
-    #     return self.value == other.value and self.color_index == other.suit
+    #     return self.value == other.value and self.color == other.color
 
 
 def calc_histogram(result_histograms, winner_list):
@@ -307,20 +315,27 @@ def run_simulation(hands_list, open_board_deck):
     tie_win_lose_list: [0, 0, 0] 
     board_length: 3
     '''
+
     hands_list_tuple = [preprocess_hand_card_to_tuple(hands_list[0]), preprocess_hand_card_to_tuple(hands_list[1])]
     '''hands_list_tuple : [('AS', 'KH'), (None, None)]'''
     if (None, None) in hands_list_tuple:
+
         unknown_index = hands_list_tuple.index((None, None))
         # todo 这一部是为对方构建底牌，把每个底牌轮进去算
         for filler_hole_cards in itertools.combinations(full_cards_list, 2):
+
+
             hands_list_tuple[unknown_index] = filler_hole_cards
 
             deck_list = full_cards_list.copy()
             deck_list.remove(filler_hole_cards[0])
             deck_list.remove(filler_hole_cards[1])
 
+            #todo 现在迭代一次是0.02s，标准为0.008，一半
             find_winner(hands_list_tuple, board_length, deck_list, open_board_deck, tie_win_lose_list,
                         card_type_result_histograms)
+
+
     else:
         find_winner(hands_list_tuple, board_length, full_card_list, open_board_deck, tie_win_lose_list,
                     card_type_result_histograms)
@@ -338,21 +353,22 @@ def find_winner(hands_list_tuple, board_length, deck_list, open_board_deck, tie_
     board_deck：翻牌区的牌
     """
     # 总
-    result_list = [None] * len(hands_list_tuple)
 
+    result_list = [None] * len(hands_list_tuple)
     for remaining_board in itertools.combinations(deck_list, 5 - board_length):
+
         if open_board_deck:
             board = open_board_deck[:]
             board.extend(remaining_board)
         else:
             board = remaining_board
 
-        poker_color_res_list, poker_num_res_list, max_poker_color_cnt = (preprocess_board(board))
+        poker_color_res_list, poker_num_res_list, max_poker_color_cnt = preprocess_board(board)
 
         for mark, hold_cards in enumerate(hands_list_tuple):
+
             result_list[mark] = detect_hand(hold_cards, board, poker_color_res_list,
                                             poker_num_res_list, max_poker_color_cnt)
-
         winner_index = compare_hands(result_list)
         tie_win_lose_list[winner_index] += 1
         # Increment what hand each player made
@@ -377,6 +393,7 @@ def poker_run(my_hold_cards: list, enemy_hold_cards: list, open_board_deck: list
     generate_rest_of_poker_bag(hands_list=[my_hold_cards, enemy_hold_cards], open_board_deck=open_board_deck)
     logger.info('剔除已知的牌，牌堆还剩{}张牌'.format(len(full_cards_list)))
     logger.info('开始模拟情景')
+
     final_result = run_simulation([my_hold_cards, enemy_hold_cards], open_board_deck)
 
     logger.info('总程序运行完毕，共耗时{}'.format(time.time() - begin_time))
