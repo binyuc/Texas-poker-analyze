@@ -94,7 +94,7 @@ class Poker:
             self.find_winner(hands_list_tuple, board_length, self.full_cards_list, open_board_deck,
                              self.tie_win_lose_list,
                              self.card_type_result_histograms)
-        print(self.tie_win_lose_list, self.card_type_result_histograms)
+        # print(self.tie_win_lose_list, self.card_type_result_histograms)
         players_histograms = calc_histogram(self.card_type_result_histograms, self.tie_win_lose_list)
         return [find_winning_percentage(self.tie_win_lose_list), players_histograms]
 
@@ -131,8 +131,8 @@ class Poker:
                 deck_list.remove(filler_hole_cards[1])
 
                 final.append(pool.apply(self.find_winner, args=(
-                hands_list_tuple, board_length, deck_list, open_board_deck, self.tie_win_lose_list,
-                self.card_type_result_histograms,)))
+                    hands_list_tuple, board_length, deck_list, open_board_deck, self.tie_win_lose_list,
+                    self.card_type_result_histograms,)))
             pool.close()
             pool.join()
 
@@ -273,11 +273,12 @@ class Poker:
             'enemy_four_kind_prob': temp[1][1]['Four of a Kind'],
             'enemy_straight_flush_prob': temp[1][1]['Straight Flush'],
             'enemy_royal_flush_prob': temp[1][1]['Royal Flush'],
-        #     time
-            'time_diff': round(time_diff,5)
+            #     time
+            # 'time_diff': round(time_diff, 5)
         }
         for k, v in final_result.items():
             final_result[k] = str(round((v * 100), 2)) + '%'
+        final_result['time_diff'] = round(time_diff, 5)
         logger.debug('最终结果{}'.format(final_result))
         return final_result
 
